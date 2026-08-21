@@ -1,4 +1,4 @@
 # Procfile.dev - development
 
-# Use the Flask development server.
+# Use the Uvicorn development server.
 web: python app.py

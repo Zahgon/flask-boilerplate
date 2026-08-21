@@ -1,4 +1,4 @@
-## Flask Boilerpate - updated!
+## FastAPI Boilerplate - updated!
 
 Starter App, powered by Real Python
 

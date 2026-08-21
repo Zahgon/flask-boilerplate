@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import os
-from flask import *
-from app import *
+
+from app import create_app
+
+app = create_app('config.development')
 
 os.environ['PYTHONINSPECT'] = 'True'

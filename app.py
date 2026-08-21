@@ -2,20 +2,38 @@
 # Imports
 #----------------------------------------------------------------------------#
 
-from flask import Flask, render_template, request
-# from flask.ext.sqlalchemy import SQLAlchemy
+import os
 import logging
 from logging import Formatter, FileHandler
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+import config
 from forms import *
-import os
 
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
 
-app = Flask(__name__)
-app.config.from_object('config')
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+app = FastAPI(debug=config.DEBUG)
 #db = SQLAlchemy(app)
+
+templates = Jinja2Templates(directory=os.path.join(basedir, 'templates'))
+# The shared templates call ``get_flashed_messages``. FastAPI has no
+# flash-message machinery and no route sets one, so expose a no-op global
+# to keep the shared templates rendering unchanged.
+templates.env.globals['get_flashed_messages'] = lambda *args, **kwargs: []
+
+app.mount(
+    '/static',
+    StaticFiles(directory=os.path.join(basedir, 'static')),
+    name='static',
+)
 
 # Automatically tear down SQLAlchemy.
 '''
@@ -41,55 +59,56 @@ def login_required(test):
 #----------------------------------------------------------------------------#
 
 
-@app.route('/')
-def home():
-    return render_template('pages/placeholder.home.html')
+@app.get('/', name='home', response_class=HTMLResponse)
+def home(request: Request):
+    return templates.TemplateResponse(request, 'pages/placeholder.home.html')
 
 
-@app.route('/about')
-def about():
-    return render_template('pages/placeholder.about.html')
+@app.get('/about', name='about', response_class=HTMLResponse)
+def about(request: Request):
+    return templates.TemplateResponse(request, 'pages/placeholder.about.html')
 
 
-@app.route('/login')
-def login():
-    form = LoginForm(request.form)
-    return render_template('forms/login.html', form=form)
+@app.get('/login', name='login', response_class=HTMLResponse)
+def login(request: Request):
+    form = LoginForm()
+    return templates.TemplateResponse(request, 'forms/login.html', {'form': form})
 
 
-@app.route('/register')
-def register():
-    form = RegisterForm(request.form)
-    return render_template('forms/register.html', form=form)
+@app.get('/register', name='register', response_class=HTMLResponse)
+def register(request: Request):
+    form = RegisterForm()
+    return templates.TemplateResponse(request, 'forms/register.html', {'form': form})
 
 
-@app.route('/forgot')
-def forgot():
-    form = ForgotForm(request.form)
-    return render_template('forms/forgot.html', form=form)
+@app.get('/forgot', name='forgot', response_class=HTMLResponse)
+def forgot(request: Request):
+    form = ForgotForm()
+    return templates.TemplateResponse(request, 'forms/forgot.html', {'form': form})
 
 # Error handlers.
 
 
-@app.errorhandler(500)
-def internal_error(error):
+@app.exception_handler(500)
+def internal_error(request: Request, error):
     #db_session.rollback()
-    return render_template('errors/500.html'), 500
+    return templates.TemplateResponse(request, 'errors/500.html', status_code=500)
 
 
-@app.errorhandler(404)
-def not_found_error(error):
-    return render_template('errors/404.html'), 404
+@app.exception_handler(404)
+def not_found_error(request: Request, error):
+    return templates.TemplateResponse(request, 'errors/404.html', status_code=404)
 
-if not app.debug:
+if not config.DEBUG:
     file_handler = FileHandler('error.log')
     file_handler.setFormatter(
         Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
     )
-    app.logger.setLevel(logging.INFO)
+    logger = logging.getLogger('uvicorn.error')
+    logger.setLevel(logging.INFO)
     file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.info('errors')
+    logger.addHandler(file_handler)
+    logger.info('errors')
 
 #----------------------------------------------------------------------------#
 # Launch.
@@ -97,11 +116,13 @@ if not app.debug:
 
 # Default port:
 if __name__ == '__main__':
-    app.run()
+    import uvicorn
+    uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('PORT', 5000)))
 
 # Or specify port manually:
 '''
 if __name__ == '__main__':
+    import uvicorn
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    uvicorn.run(app, host='0.0.0.0', port=port)
 '''

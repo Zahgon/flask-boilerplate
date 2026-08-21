@@ -1,23 +1,28 @@
+import importlib
 import logging
 
-from flask import Flask, request as req
+from fastapi import FastAPI, Request
 
 from app.controllers import pages
 
+logger = logging.getLogger('app')
+
 
 def create_app(config_filename):
-    app = Flask(__name__)
-    app.config.from_object(config_filename)
+    config = importlib.import_module(config_filename)
+    app = FastAPI(debug=getattr(config, 'DEBUG', False))
 
-    app.register_blueprint(pages.blueprint)
+    app.include_router(pages.router)
 
-    app.logger.setLevel(logging.NOTSET)
+    logger.setLevel(logging.NOTSET)
 
-    @app.after_request
-    def log_response(resp):
-        app.logger.info("{} {} {}\n{}".format(
-            req.method, req.url, req.data, resp)
+    @app.middleware('http')
+    async def log_response(request: Request, call_next):
+        response = await call_next(request)
+        body = await request.body()
+        logger.info(
+            "{} {} {}\n{}".format(request.method, request.url, body, response)
         )
-        return resp
+        return response
 
     return app

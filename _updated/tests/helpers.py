@@ -1,46 +1,57 @@
-import json
 import unittest
 
+from fastapi.testclient import TestClient as _StarletteTestClient
+
 from app import create_app
+
+
+class _Response(object):
+    """Wrap a Starlette/httpx response so ``.data`` yields decoded text.
+
+    The original Werkzeug-based helper returned ``rv.data`` as a native
+    string under Python 2. On Python 3 that attribute is ``bytes``; exposing
+    the decoded body here keeps ``substring in rv.data`` assertions working
+    exactly as the tests were written.
+    """
+
+    def __init__(self, response):
+        self._response = response
+
+    @property
+    def data(self):
+        return self._response.text
+
+    @property
+    def status_code(self):
+        return self._response.status_code
 
 
 class TestClient(object):
     def __init__(self, app):
         self.app = app
-
-    def send(self, url, method, data=None, headers=None):
-        if headers is None:
-            headers = {}
-        if data:
-            data = json.dumps(data)
-        with self.app.test_request_context(url, method=method, data=data,
-                                           headers=headers):
-            rv = self.app.preprocess_request()
-            if rv is None:
-                rv = self.app.dispatch_request()
-            rv = self.app.make_response(rv)
-            rv = self.app.process_response(rv)
-            return rv
+        self.client = _StarletteTestClient(app)
 
     def get(self, url, headers=None):
-        return self.send(url, 'GET', headers=headers)
+        return _Response(self.client.get(url, headers=headers or {}))
 
-    def post(self, url, data, headers=None):
-        return self.send(url, 'POST', data, headers=headers)
+    def post(self, url, data=None, headers=None):
+        return _Response(
+            self.client.post(url, json=data, headers=headers or {})
+        )
 
-    def put(self, url, data, headers={}):
-        return self.send(url, 'PUT', data, headers=headers)
+    def put(self, url, data=None, headers=None):
+        return _Response(
+            self.client.put(url, json=data, headers=headers or {})
+        )
 
-    def delete(self, url, headers={}):
-        return self.send(url, 'DELETE', headers=headers)
+    def delete(self, url, headers=None):
+        return _Response(self.client.delete(url, headers=headers or {}))
 
 
 class TestCase(unittest.TestCase):
     def setUp(self):
         self.app = create_app('config')
-        self.ctx = self.app.app_context()
-        self.ctx.push()
         self.client = TestClient(self.app)
 
     def tearDown(self):
-        self.ctx.pop()
+        pass

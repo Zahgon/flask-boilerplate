@@ -2,3 +2,7 @@
 .DS_Store
 env
 venv
+.venv/
+database.db
+__pycache__/
+.coverage
